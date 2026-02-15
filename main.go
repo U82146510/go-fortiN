@@ -176,6 +176,7 @@ func start(filename string, numberOfWorkers int, ctx context.Context) {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
+			defer func() { recover() }()
 			for {
 				line, ok := <-jobs
 				if !ok {
@@ -232,6 +233,10 @@ func main() {
 	// Generate combinations first
 	generateCombinations("ip.txt", "user.txt", "password.txt")
 	totalLines = countTotal("ip.txt")
+	if totalLines == 0 {
+		fmt.Println("No IPs found, exiting.")
+		return
+	}
 
 	// Call start with a sample filename and workers
 	start("input.txt", 10, ctx)
